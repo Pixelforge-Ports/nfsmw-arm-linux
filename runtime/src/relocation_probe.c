@@ -1,8 +1,10 @@
+#include "platform_probe.h"
 #include "relocation_probe.h"
 
 #include "compat_bridge.h"
 #include "softfp_symbols.h"
 #include "symbol_probe.h"
+#include "fmod_output.h"
 
 #include <dlfcn.h>
 #include <stdarg.h>
@@ -24,6 +26,17 @@ struct relocation_context {
 static void *nfsmw_dso_handle;
 static void *retained_host_handles[RELOCATION_HOST_CAPACITY];
 static size_t retained_host_count;
+static nfsmw_fmod_set_output_fn guest_set_output[2];
+
+static int compatible_set_output(void *system, int output)
+{
+    return nfsmw_fmod_select_output(guest_set_output[0], system, output);
+}
+
+static int compatible_cpp_set_output(void *system, int output)
+{
+    return nfsmw_fmod_select_output(guest_set_output[1], system, output);
+}
 
 static void nfsmw_android_assert2(const char *file, int line,
                                   const char *function, const char *message)
@@ -144,7 +157,21 @@ static uintptr_t relocation_lookup(const char *name, unsigned int binding,
     for (index = 0U; index < context->current_image; ++index) {
         address = elf32_find_export(&context->images[index], name);
         if (address != 0U) {
+            int output_symbol = nfsmw_fmod_output_symbol(name);
             context->stats->guest_resolutions += 1U;
+            if (output_symbol >= 0 &&
+                context->images[context->current_image].soname != NULL &&
+                strcmp(context->images[context->current_image].soname,
+                       "libapp.so") == 0 &&
+                sizeof(guest_set_output[0]) == sizeof(address)) {
+                nfsmw_fmod_set_output_fn wrapper = output_symbol == 0 ?
+                    compatible_set_output : compatible_cpp_set_output;
+                (void)memcpy(&guest_set_output[output_symbol], &address,
+                             sizeof(address));
+                (void)memcpy(&address, &wrapper, sizeof(address));
+                (void)printf("G8-FMOD output selection fallback installed: %s\n",
+                             name);
+            }
             return address;
         }
     }
@@ -169,6 +196,8 @@ static uintptr_t relocation_lookup(const char *name, unsigned int binding,
         context->stats->blocked_resolutions += 1U;
         return 0U;
     }
+    address = nfsmw_display_resolve(name);
+    if (address != 0U) return address;
     address = host_lookup(context, name);
     if (address != 0U) {
         context->stats->host_resolutions += 1U;

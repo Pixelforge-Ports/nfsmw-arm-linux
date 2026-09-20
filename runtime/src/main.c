@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <dlfcn.h>
 
 enum { MODULE_COUNT = 5, PATH_CAPACITY = 4096 };
 
@@ -24,6 +25,26 @@ static const char *const module_names[MODULE_COUNT] = {
 
 int main(int argc, char **argv)
 {
+    if (argc == 4 && strcmp(argv[1], "--probe-gl") == 0) {
+        void *egl = dlopen(argv[2], RTLD_NOW | RTLD_GLOBAL);
+        if (egl == NULL) {
+            (void)fprintf(stderr, "GL probe EGL %s: %s\n", argv[2], dlerror());
+            return 1;
+        }
+        void *gles = dlopen(argv[3], RTLD_NOW | RTLD_GLOBAL);
+        if (gles == NULL) {
+            (void)fprintf(stderr, "GL probe GLES %s: %s\n", argv[3], dlerror());
+            (void)dlclose(egl);
+            return 1;
+        }
+        const int valid = dlsym(egl, "eglGetDisplay") != NULL &&
+                          dlsym(egl, "eglGetProcAddress") != NULL &&
+                          dlsym(gles, "glGetString") != NULL;
+        if (!valid) (void)fprintf(stderr, "GL probe: missing EGL/GLES entry points\n");
+        (void)dlclose(gles);
+        (void)dlclose(egl);
+        return valid ? 0 : 1;
+    }
     struct elf32_image images[MODULE_COUNT];
     struct nfsmw_symbol_probe_stats symbol_stats;
     struct nfsmw_platform_probe_result platform_result;

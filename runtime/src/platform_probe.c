@@ -25,7 +25,14 @@ struct sdl_audio_spec {
     void *userdata;
 };
 
+struct sdl_display_mode {
+    uint32_t format;
+    int w, h, refresh_rate;
+    void *driverdata;
+};
+
 struct sdl_api {
+    int (*get_current_display_mode)(int display, struct sdl_display_mode *mode);
     void *library;
     int (*init)(uint32_t flags);
     int (*init_subsystem)(uint32_t flags);
@@ -187,6 +194,7 @@ static int open_sdl(struct sdl_api *api)
                       dlerror());
         return -1;
     }
+    LOAD_API(api, get_current_display_mode, "SDL_GetCurrentDisplayMode");
     LOAD_API(api, init, "SDL_Init");
     LOAD_API(api, init_subsystem, "SDL_InitSubSystem");
     LOAD_API(api, quit, "SDL_Quit");
@@ -293,9 +301,14 @@ static int probe_graphics(struct sdl_api *api)
                       sdl_error(api));
         return -1;
     }
+    struct sdl_display_mode mode;
+    int window_width = 640, window_height = 480;
+    if (api->get_current_display_mode(0, &mode) == 0 && mode.w > 0 && mode.h > 0) {
+        window_width = mode.w; window_height = mode.h;
+    }
     window = api->create_window(
         "NFS Most Wanted preflight", SDL_WINDOWPOS_UNDEFINED_VALUE,
-        SDL_WINDOWPOS_UNDEFINED_VALUE, 640, 480,
+        SDL_WINDOWPOS_UNDEFINED_VALUE, window_width, window_height,
         SDL_WINDOW_FULLSCREEN_VALUE | SDL_WINDOW_OPENGL_VALUE |
             SDL_WINDOW_SHOWN_VALUE);
     if (window == NULL) {
@@ -339,8 +352,8 @@ static int probe_graphics(struct sdl_api *api)
         api->gl_swap_window(window);
         api->delay(60U);
     }
-    if (width != 640 || height != 480) {
-        (void)fprintf(stderr, "G5-HOST FAIL expected 640x480 drawable\n");
+    if (width <= 0 || height <= 0) {
+        (void)fprintf(stderr, "G5-HOST FAIL invalid drawable size\n");
         goto done;
     }
     (void)printf("G5-HOST PASS SDL=%s GLES2 frames=3\n",
@@ -485,6 +498,41 @@ struct persistent_runtime {
 
 static struct persistent_runtime runtime;
 
+
+static int render_width = 640, render_height = 480;
+static void (*display_viewport)(int, int, int, int);
+static void (*display_scissor)(int, int, int, int);
+int nfsmw_display_width(void) { return render_width; }
+int nfsmw_display_height(void) { return render_height; }
+
+static void scale_rect(int *x, int *y, int *w, int *h) {
+    int framebuffer = 0;
+    if (runtime.gl_get_integer_v == NULL) return;
+    runtime.gl_get_integer_v(GL_FRAMEBUFFER_BINDING_VALUE, &framebuffer);
+    if (framebuffer != 0 || runtime.drawable_width <= 0 || runtime.drawable_height <= 0) return;
+    *x = (int)((int64_t)*x * runtime.drawable_width / render_width);
+    *y = (int)((int64_t)*y * runtime.drawable_height / render_height);
+    *w = (int)((int64_t)*w * runtime.drawable_width / render_width);
+    *h = (int)((int64_t)*h * runtime.drawable_height / render_height);
+}
+static void mapped_viewport(int x, int y, int w, int h) {
+    scale_rect(&x, &y, &w, &h);
+    if (display_viewport != NULL) display_viewport(x,y,w,h);
+}
+static void mapped_scissor(int x, int y, int w, int h) {
+    scale_rect(&x, &y, &w, &h);
+    if (display_scissor != NULL) display_scissor(x,y,w,h);
+}
+uintptr_t nfsmw_display_resolve(const char *name) {
+    uintptr_t address = 0U;
+    void (*function)(int,int,int,int) = NULL;
+    if (strcmp(name, "glViewport") == 0) function = mapped_viewport;
+    if (strcmp(name, "glScissor") == 0) function = mapped_scissor;
+    if (function != NULL && sizeof(function) == sizeof(address))
+        (void)memcpy(&address, &function, sizeof(address));
+    return address;
+}
+
 int nfsmw_platform_runtime_start(int width, int height)
 {
     int count;
@@ -503,6 +551,23 @@ int nfsmw_platform_runtime_start(int width, int height)
         (void)fprintf(stderr, "G5-RUNTIME FAIL SDL startup\n");
         goto fail;
     }
+    const char *resolution = getenv("NFSMW_RESOLUTION");
+    const int automatic = resolution == NULL || resolution[0] == '\0' || strcmp(resolution, "auto") == 0;
+    struct sdl_display_mode mode;
+    if (automatic) {
+        if (runtime.api.get_current_display_mode(0, &mode) == 0) { width = mode.w; height = mode.h; }
+    } else {
+        char extra;
+        if (sscanf(resolution, "%dx%d%c", &width, &height, &extra) != 2) {
+            (void)fprintf(stderr, "NFSMW_RESOLUTION must be auto or WIDTHxHEIGHT\n");
+            goto fail;
+        }
+    }
+    if (width < 160 || height < 160 || width > 4096 || height > 4096) {
+        (void)fprintf(stderr, "Display size must be within 160..4096 pixels\n");
+        goto fail;
+    }
+    render_width = width; render_height = height;
     (void)runtime.api.set_hint("SDL_OPENGL_ES_DRIVER", "1");
     (void)runtime.api.set_hint("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0");
     if (set_gl_attributes(&runtime.api) != 0) {
@@ -577,6 +642,13 @@ int nfsmw_platform_runtime_start(int width, int height)
                                      &drawable_width, &drawable_height);
     runtime.drawable_width = drawable_width;
     runtime.drawable_height = drawable_height;
+    if (automatic && drawable_width >= 160 && drawable_height >= 160 && drawable_width <= 4096 && drawable_height <= 4096) {
+        render_width = drawable_width; render_height = drawable_height;
+    }
+    if (load_gl_function(&runtime.api, "glViewport", &display_viewport, sizeof(display_viewport)) != 0 ||
+        load_gl_function(&runtime.api, "glScissor", &display_scissor, sizeof(display_scissor)) != 0) goto fail;
+    (void)printf("NFSMW render=%dx%d display=%dx%d\n", render_width, render_height, drawable_width, drawable_height);
+
     count = runtime.api.num_joysticks();
     for (index = 0; index < count; ++index) {
         if (runtime.api.is_game_controller(index) != 0) {
@@ -750,6 +822,9 @@ static void runtime_capture_frame(unsigned int frame)
 void nfsmw_platform_runtime_present(unsigned int frame, int cursor_x,
                                     int cursor_y, int cursor_visible)
 {
+    cursor_x = (int)((int64_t)cursor_x * runtime.drawable_width / render_width);
+    cursor_y = (int)((int64_t)cursor_y * runtime.drawable_height / render_height);
+
     if (runtime.started != 0 && runtime.window != NULL) {
         runtime_gl_diagnostics(frame);
         runtime_capture_frame(frame);

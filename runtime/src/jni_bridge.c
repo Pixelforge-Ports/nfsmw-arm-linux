@@ -964,8 +964,8 @@ static int dispatch_int_v(void *receiver, struct fake_method *method,
     if (strcmp(name, "getTotalMemory") == 0) return 768;
     if (strcmp(name, "getPerformanceScore") == 0)
         return (int)configured_performance_score();
-    if (strcmp(name, "getWidth") == 0) return 640;
-    if (strcmp(name, "getHeight") == 0) return 480;
+    if (strcmp(name, "getWidth") == 0) return nfsmw_display_width();
+    if (strcmp(name, "getHeight") == 0) return nfsmw_display_height();
     if (strcmp(name, "getPointerCount") == 0) return 1;
     return 0;
 }
@@ -1013,8 +1013,8 @@ static int jni_call_int_method_a(void *environment, void *object,
     if (strcmp(name, "getTotalMemory") == 0) return 768;
     if (strcmp(name, "getPerformanceScore") == 0)
         return (int)configured_performance_score();
-    if (strcmp(name, "getWidth") == 0) return 640;
-    if (strcmp(name, "getHeight") == 0) return 480;
+    if (strcmp(name, "getWidth") == 0) return nfsmw_display_width();
+    if (strcmp(name, "getHeight") == 0) return nfsmw_display_height();
     if (strcmp(name, "getPointerCount") == 0) return 1;
     return 0;
 }
@@ -1067,6 +1067,19 @@ static float moga_axis_value(const struct fake_object *object, int axis)
     return values[index];
 }
 
+static int fallback_font_scale(float text_size)
+{
+    if (!(text_size > 0.0F)) text_size = 16.0F;
+    if (text_size >= 56.0F) return 8;
+    if (text_size < 7.0F) return 1;
+    return (int)(text_size / 7.0F);
+}
+
+static float fallback_text_width(const char *text, float text_size)
+{
+    return (float)strlen(text) * (float)(6 * fallback_font_scale(text_size));
+}
+
 static float dispatch_float(void *receiver, struct fake_method *method,
                             va_list *arguments)
 {
@@ -1090,7 +1103,7 @@ static float dispatch_float(void *receiver, struct fake_method *method,
     if (strcmp(name, "getTextSize") == 0) return text_size;
     if (strcmp(name, "measureText") == 0) {
         const char *text = string_value(va_arg(*arguments, void *));
-        return (float)strlen(text) * text_size * (6.0F / 7.0F);
+        return fallback_text_width(text, text_size);
     }
     return 0.0F;
 }
@@ -1142,8 +1155,7 @@ jni_call_float_method_a(void *environment, void *object, void *method,
         return moga_axis_value(fake_object, values[0].int_value);
     if (strcmp(name, "getTextSize") == 0) return text_size;
     if (strcmp(name, "measureText") == 0 && values != NULL)
-        return (float)strlen(string_value(values[0].object_value)) *
-               text_size * (6.0F / 7.0F);
+        return fallback_text_width(string_value(values[0].object_value), text_size);
     return 0.0F;
 }
 
@@ -1224,10 +1236,7 @@ static void draw_text(struct fake_object *graphics,
     bitmap = as_object(graphics->elements[0]);
     if (bitmap == NULL || bitmap->kind != FAKE_BITMAP ||
         bitmap->bytes == NULL) return;
-    scale = (int)((paint != NULL && paint->text_size > 0.0F ?
-                   paint->text_size : 16.0F) / 7.0F);
-    if (scale < 1) scale = 1;
-    if (scale > 8) scale = 8;
+    scale = fallback_font_scale(paint != NULL ? paint->text_size : 16.0F);
     for (character_index = 0U; text[character_index] != '\0';
          ++character_index) {
         unsigned int row;
@@ -1398,13 +1407,13 @@ static int jni_get_int_field(void *environment, void *object, void *field_value)
     float text_size = fake_object != NULL && fake_object->text_size > 0.0F ?
                       fake_object->text_size : 16.0F;
     (void)environment;
-    if (strcmp(name, "widthPixels") == 0) return 640;
-    if (strcmp(name, "heightPixels") == 0) return 480;
+    if (strcmp(name, "widthPixels") == 0) return nfsmw_display_width();
+    if (strcmp(name, "heightPixels") == 0) return nfsmw_display_height();
     if (strcmp(name, "densityDpi") == 0) return 160;
-    if (strcmp(name, "ascent") == 0) return -(int)(text_size * 0.75F);
-    if (strcmp(name, "descent") == 0) return (int)(text_size * 0.25F);
-    if (strcmp(name, "bottom") == 0) return (int)(text_size * 0.25F);
-    if (strcmp(name, "top") == 0) return -(int)(text_size * 0.875F);
+    if (strcmp(name, "ascent") == 0 || strcmp(name, "top") == 0)
+        return -7 * fallback_font_scale(text_size);
+    if (strcmp(name, "descent") == 0 || strcmp(name, "bottom") == 0)
+        return 0;
     return 0;
 }
 
@@ -1933,8 +1942,8 @@ int nfsmw_jni_run(const struct elf32_image *fmod_image,
     unsigned char previous[15] = { 0U };
     short previous_axes[6] = { 0, 0, 0, 0, 0, 0 };
     int have_previous_axes = 0;
-    int cursor_x = 320;
-    int cursor_y = 240;
+    int cursor_x = nfsmw_display_width() / 2;
+    int cursor_y = nfsmw_display_height() / 2;
     int cursor_visible = 0;
     int touch_down = 0;
     unsigned int last_motion_log = 0U;
@@ -2100,9 +2109,9 @@ int nfsmw_jni_run(const struct elf32_image *fmod_image,
             cursor_x += cursor_dx;
             cursor_y += cursor_dy;
             if (cursor_x < 8) cursor_x = 8;
-            if (cursor_x > 631) cursor_x = 631;
+            if (cursor_x > nfsmw_display_width() - 9) cursor_x = nfsmw_display_width() - 9;
             if (cursor_y < 8) cursor_y = 8;
-            if (cursor_y > 471) cursor_y = 471;
+            if (cursor_y > nfsmw_display_height() - 9) cursor_y = nfsmw_display_height() - 9;
             direct_steering = 0.0F;
             direct_vertical = 0.0F;
         }

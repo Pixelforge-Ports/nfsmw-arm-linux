@@ -25,3 +25,6 @@ run[0-9]*/
 # Local OS and oversized raw captures
 .DS_Store
 *.tga
+
+__pycache__/
+portmaster/nfsmw/eapx.py

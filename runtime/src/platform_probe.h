@@ -1,5 +1,9 @@
 #ifndef NFSMW_PLATFORM_PROBE_H
 #define NFSMW_PLATFORM_PROBE_H
+#include <stdint.h>
+int nfsmw_display_width(void);
+int nfsmw_display_height(void);
+uintptr_t nfsmw_display_resolve(const char *name);
 
 struct nfsmw_platform_probe_result {
     int graphics;

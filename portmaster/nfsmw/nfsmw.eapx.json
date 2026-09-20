@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "id": "nfsmw-1.3.128",
+  "version": "1",
+  "requires_eapx": ">=0.4.4",
+  "title": "Need for Speed Most Wanted",
+  "abi_order": [
+    "armeabi-v7a"
+  ],
+  "input": {
+    "search_dirs": [
+      "gamedata"
+    ]
+  },
+  "extract": [
+    {
+      "id": "libNimble-so",
+      "description": "libNimble.so",
+      "destination": "gamefiles/android-libs/libNimble.so",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "lib/armeabi-v7a/libNimble.so"
+        ]
+      },
+      "validate": {
+        "sha256": [
+          "ace73446e2e526a5dd1f098cb4d50dae5f18a83706856d91337c588ff5e6d4b6"
+        ],
+        "elf_machine": "armeabi-v7a"
+      }
+    },
+    {
+      "id": "libapp-so",
+      "description": "libapp.so",
+      "destination": "gamefiles/android-libs/libapp.so",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "lib/armeabi-v7a/libapp.so"
+        ]
+      },
+      "validate": {
+        "sha256": [
+          "a73dcc170552866af52bf2d4f5822606307fb42aed1ef0df2e469fdfa374ff43"
+        ],
+        "elf_machine": "armeabi-v7a"
+      }
+    },
+    {
+      "id": "libcpp_shared-so",
+      "description": "libc++_shared.so",
+      "destination": "gamefiles/android-libs/libc++_shared.so",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "lib/armeabi-v7a/libc++_shared.so"
+        ]
+      },
+      "validate": {
+        "sha256": [
+          "ee86a2cb55d2d205260793c67997cdd9cf3d2e7588ecf7c122e4790b7c2c2005"
+        ],
+        "elf_machine": "armeabi-v7a"
+      }
+    },
+    {
+      "id": "libfmodevent-so",
+      "description": "libfmodevent.so",
+      "destination": "gamefiles/android-libs/libfmodevent.so",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "lib/armeabi-v7a/libfmodevent.so"
+        ]
+      },
+      "validate": {
+        "sha256": [
+          "cfb17d2de3d95732a364c29ee032a501eabe26b9fc7af47433f5537fa85c6ce0"
+        ],
+        "elf_machine": "armeabi-v7a"
+      }
+    },
+    {
+      "id": "libfmodex-so",
+      "description": "libfmodex.so",
+      "destination": "gamefiles/android-libs/libfmodex.so",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "lib/armeabi-v7a/libfmodex.so"
+        ]
+      },
+      "validate": {
+        "sha256": [
+          "7c29ab877deb862c0154b548a057d35eb70cd0cf20b714054b65921e6961a6e8"
+        ],
+        "elf_machine": "armeabi-v7a"
+      }
+    },
+    {
+      "id": "expansion",
+      "description": "Game expansion data",
+      "destination": "gamefiles/main.1003128.com.ea.games.nfs13_row.obb",
+      "source": {
+        "kind": "blob",
+        "patterns": [
+          "main.1003128.com.ea.games.nfs13_row.obb"
+        ]
+      },
+      "validate": {
+        "sha256": [
+          "66dd4e695e698929f789e7c825eabe3ba5a50ed2ce28b628c96e5dbc008043a1"
+        ]
+      }
+    }
+  ],
+  "validate": [
+    {
+      "path": "gamefiles/android-libs/libNimble.so",
+      "sha256": [
+        "ace73446e2e526a5dd1f098cb4d50dae5f18a83706856d91337c588ff5e6d4b6"
+      ],
+      "elf_machine": "armeabi-v7a"
+    },
+    {
+      "path": "gamefiles/android-libs/libapp.so",
+      "sha256": [
+        "a73dcc170552866af52bf2d4f5822606307fb42aed1ef0df2e469fdfa374ff43"
+      ],
+      "elf_machine": "armeabi-v7a"
+    },
+    {
+      "path": "gamefiles/android-libs/libc++_shared.so",
+      "sha256": [
+        "ee86a2cb55d2d205260793c67997cdd9cf3d2e7588ecf7c122e4790b7c2c2005"
+      ],
+      "elf_machine": "armeabi-v7a"
+    },
+    {
+      "path": "gamefiles/android-libs/libfmodevent.so",
+      "sha256": [
+        "cfb17d2de3d95732a364c29ee032a501eabe26b9fc7af47433f5537fa85c6ce0"
+      ],
+      "elf_machine": "armeabi-v7a"
+    },
+    {
+      "path": "gamefiles/android-libs/libfmodex.so",
+      "sha256": [
+        "7c29ab877deb862c0154b548a057d35eb70cd0cf20b714054b65921e6961a6e8"
+      ],
+      "elf_machine": "armeabi-v7a"
+    },
+    {
+      "path": "gamefiles/main.1003128.com.ea.games.nfs13_row.obb",
+      "sha256": [
+        "66dd4e695e698929f789e7c825eabe3ba5a50ed2ce28b628c96e5dbc008043a1"
+      ]
+    }
+  ],
+  "commit": [
+    "gamefiles"
+  ],
+  "marker": ".eapx-nfsmw-data.json",
+  "log": "eapx.log",
+  "space": {
+    "safety_bytes": 67108864
+  }
+}

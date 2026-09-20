@@ -24,6 +24,21 @@ Android libraries, or other Electronic Arts assets.
 Soundtrack playback is disabled because the original Android decoder enters a
 retry loop on Linux and substantially reduces performance.
 
+### Audio and text troubleshooting
+
+On RG34XX SP with muOS, a successful SDL audio preflight can still be followed
+by `System_setOutput` and `EventSystem::init` failures inside FMOD. The runtime
+now retries a rejected explicit output selection with FMOD's automatic mode.
+The hook covers both the C API and the C++ method imported by this game build.
+This fallback still needs handheld verification. Check `logs/nfsmw.log` for
+`G8-FMOD` selection results and `G8-AUDIOTRACK` mixer startup when reporting
+remaining silence. The fallback does not enable the disabled soundtrack.
+
+The fallback bitmap font now uses matching measurement, drawing and baseline
+bounds to prevent clipping. It remains a simple block font. Audio fallback and
+font-bound regression checks can be run with `python3 -m unittest discover -s
+tests -v` on Linux; font checks require `arm-linux-gnueabihf-gcc` and `qemu-arm`.
+
 ## Installation
 
 1. Download
@@ -104,3 +119,40 @@ tracked in [issue #1](https://github.com/Detoy/nfsmw-r36s/issues/1). Please read
 The compatibility code and packaging are available under the [MIT License](LICENSE).
 The license does not cover *Need for Speed*, its code, data, artwork, audio, or
 trademarks. Those remain the property of their respective owners.
+
+## Pixelforge handheld adaptation
+
+Based on [Detoy's port](https://github.com/Detoy/nfsmw-r36s), with display, setup and packaging adaptations by Pixelforge ports (Ronax). eapx by EapRules provides the first-launch stages and percentage display. Original MIT notices are retained; the separately distributed eapx tool carries its own GPL licence.
+
+Native display size is detected automatically. `ports/nfsmw/resolution.txt` accepts `auto` or `WIDTHxHEIGHT`; manual render sizes are stretched onto the panel. Target sizes include 640x480, 720x480, 720x720, 1024x768 and 1280x720. New sizes and muOS support require handheld testing.
+
+## Build on Windows
+
+Install Docker Desktop with the WSL2 Linux engine and leave it running. From PowerShell in this repository:
+
+```powershell
+docker build -t nfsmw-build -f Dockerfile.build .
+docker run --rm --mount "type=bind,source=$($PWD.Path),target=/src" -w /src nfsmw-build bash -lc "make -C runtime clean && make -C runtime CROSS=arm-linux-gnueabihf- -j2 && bash portmaster/build_port.sh"
+```
+
+Output: `portmaster/dist/nfsmw.zip`. No APK, OBB or extracted game files are needed to build.
+
+The build uses a Debian Bullseye snapshot and rejects a runtime requiring glibc newer than 2.31. A clean rebuild prevents objects from a newer toolchain being reused. This addresses newer-toolchain glibc requirements without replacing the handheld's libc. The RG34XX-SP muOS report confirms the old `nfsmw_runtime` requires `GLIBC_2.38` from `/lib32/libm.so.6` and `/lib32/libc.so.6`. Replace the runtime with the new build; do not replace the firmware libraries. Firmware must provide ARM32 support and its own SDL2/EGL/GLES libraries.
+
+`package/` contains the website metadata and redistributable files. Run `python tools/sync_package.py` to refresh it. The ZIP includes no purchased game content. See `package/README.md` for installation, progress and display settings. These changes have not been tested on a handheld.
+
+## One-command Windows build
+
+With Docker Desktop running in Linux-container mode, run from this source folder:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+```
+
+This script runs the Docker image build, compilation and packaging steps above. Add `-NoCache` to refresh the build environment. No game files are required.
+
+## muOS graphics and audio setup
+
+The launcher probes the firmware's ARM32 EGL/GLES pair, including `/usr/lib32` and `/lib32`, before starting the game. It uses the firmware's video driver selection and sets the 32-bit PipeWire/SPA module directories where present. The graphics startup check accepts the actual display size instead of requiring 640x480.
+
+The reported RG34XX-SP log confirms glibc compatibility and successful game-data import; the graphics/audio startup changes still need a device test. Rebuild and update the launcher, runtime and `runtime-env.sh` together. Keep `gamefiles/`, `files/`, and `.eapx-nfsmw-data.json` when updating so validated data and saves are retained.

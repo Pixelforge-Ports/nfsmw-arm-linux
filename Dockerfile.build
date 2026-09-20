@@ -1,0 +1,16 @@
+FROM debian:bullseye
+# Keep the Bullseye ABI while avoiding removed packages on the live mirrors.
+# HTTP bootstraps ca-certificates; APT still verifies Debian signatures/hashes.
+ARG DEBIAN_SNAPSHOT=20260830T000000Z
+RUN dpkg --add-architecture armhf && \
+    rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources && \
+    printf '%s\n' \
+        "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}/ bullseye main" \
+        "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}/ bullseye-security main" \
+        > /etc/apt/sources.list && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get -o Acquire::Retries=5 -o APT::Update::Error-Mode=any update && \
+    apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
+        crossbuild-essential-armhf python3 make zip unzip ca-certificates file \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
