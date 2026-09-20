@@ -3,3 +3,6 @@ Based on Detoy's port; first-launch importer by EapRules.
 Install nfsmw.zip through PortMaster and supply the supported Android 1.3.128 APK and OBB in ports/nfsmw/gamedata/.
 Please test muOS RG34XX-SP startup, all controls, saves, first-launch progress, and 640x480/720x480/720x720/1024x768/1280x720 displays.
 Report firmware, device, GPU driver and logs/nfsmw.log. No handheld validation of this adaptation yet.
+Sound fix needing tests:
+- Check menu, engine and collision sound effects. FMOD CPU detection now uses Linux ARM32 HWCAP instead of Android-era cpuinfo parsing. Music remains disabled.
+- Include G8-FMOD and G8-AUDIOTRACK log lines.

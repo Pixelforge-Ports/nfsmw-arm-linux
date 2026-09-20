@@ -20,9 +20,17 @@ Making touch injection use the title's registered view is the leading fix.
 Technical discussion is tracked in
 [issue #1](https://github.com/Detoy/nfsmw-r36s/issues/1).
 
+## Sound effects
+
+The RG34XX-SP muOS log shows successful SDL/ALSA startup followed by FMOD
+error 48 and a null EventSystem. The bundled CPU detector parses Android-era
+`/proc/cpuinfo`; the updated source uses the ARM32 process's Linux HWCAP flags.
+The patch checks the donor instructions before changing the detector.
+Sound effects are not yet confirmed fixed on muOS; device testing is required.
+
 ## Music
 
-Sound effects work. Music is disabled because the original Android decoder
+Music is disabled because the original Android decoder
 fails and retries continuously on Linux, causing a large performance loss.
 
 ## Experimental cursor

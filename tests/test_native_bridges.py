@@ -27,5 +27,8 @@ class NativeBridgeTests(unittest.TestCase):
     def test_output_selection(self):
         self.check_program('fmod_output_test')
 
+    def test_cpu_feature_translation(self):
+        self.check_program('fmod_cpu_test')
+
     def test_text_bounds_and_measurement(self):
         self.check_program('font_metrics_test', arm=True)

@@ -153,6 +153,16 @@ This script runs the Docker image build, compilation and packaging steps above. 
 
 ## muOS graphics and audio setup
 
+The latest source replaces the bundled FMOD library's old `/proc/cpuinfo`
+feature detector with Linux ARM32 `AT_HWCAP` detection. The reported
+`setOutput ... result=48` followed by `EventSystem is null` happens before
+sound banks load; changing volume or ALSA settings cannot repair that failure.
+The patch checks the donor instructions before applying and does not claim
+CPU features absent from the kernel. It targets sound effects; the Android
+soundtrack decoder remains disabled. After rebuilding, look for
+`G8-FMOD CPU HWCAP`, a successful `setOutput` result and an active
+`G8-AUDIOTRACK` mixer in `logs/nfsmw.log`. Device verification is still required.
+
 The launcher probes the firmware's ARM32 EGL/GLES pair, including `/usr/lib32` and `/lib32`, before starting the game. It uses the firmware's video driver selection and sets the 32-bit PipeWire/SPA module directories where present. The graphics startup check accepts the actual display size instead of requiring 640x480.
 
 The reported RG34XX-SP log confirms glibc compatibility and successful game-data import; the graphics/audio startup changes still need a device test. Rebuild and update the launcher, runtime and `runtime-env.sh` together. Keep `gamefiles/`, `files/`, and `.eapx-nfsmw-data.json` when updating so validated data and saves are retained.

@@ -4,6 +4,7 @@
 #include "opensl_bridge.h"
 #include "platform_probe.h"
 #include "softfp_bridge.h"
+#include "fmod_cpu.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -12,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/auxv.h>
 #include <time.h>
 
 enum {
@@ -38,6 +40,50 @@ enum {
  * normal inactive state (3) for NULL and otherwise replay the displaced
  * prologue.  Every source and cave word is verified before modifying memory.
  */
+static uint64_t linux_cpu_features(void)
+{
+    return nfsmw_android_cpu_features(getauxval(AT_HWCAP));
+}
+
+int nfsmw_apply_fmod_patches(const struct elf32_image *image,
+                            char *error, size_t error_size)
+{
+    /* Verified libfmodex 1.3.128: old NDK /proc/cpuinfo detection misses
+     * ARM32 VFP/NEON on AArch64 kernels. Use the process's actual HWCAP. */
+    const size_t offset = 0x000bfe0cU;
+    const uint32_t expected[3] = {0xe59f0020U, 0xe59f1020U, 0xe92d4010U};
+    uint32_t jump[3] = {0xe59fc000U, 0xe12fff1cU, 0U};
+    uint64_t (*replacement)(void) = linux_cpu_features;
+    uintptr_t address, page;
+    if (image == NULL || image->mapping == NULL || image->page_size == 0U ||
+        offset + sizeof(expected) > image->mapping_size ||
+        sizeof(replacement) != sizeof(jump[2])) {
+        (void)snprintf(error, error_size, "invalid FMOD CPU patch image");
+        return -1;
+    }
+    address = image->load_bias + offset;
+    if (memcmp((const void *)address, expected, sizeof(expected)) != 0) {
+        (void)snprintf(error, error_size, "unsupported FMOD CPU detector");
+        return -1;
+    }
+    (void)memcpy(&jump[2], &replacement, sizeof(jump[2]));
+    page = address & ~((uintptr_t)image->page_size - 1U);
+    if (mprotect((void *)page, image->page_size,
+                 PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+        (void)snprintf(error, error_size, "FMOD CPU patch mprotect failed");
+        return -1;
+    }
+    (void)memcpy((void *)address, jump, sizeof(jump));
+    __builtin___clear_cache((char *)address, (char *)(address + sizeof(jump)));
+    if (mprotect((void *)page, image->page_size, PROT_READ | PROT_EXEC) != 0) {
+        (void)snprintf(error, error_size, "FMOD CPU patch protection restore failed");
+        return -1;
+    }
+    (void)printf("G8-FMOD CPU HWCAP=0x%lx Android features=0x%llx\n",
+                 getauxval(AT_HWCAP), (unsigned long long)linux_cpu_features());
+    return 0;
+}
+
 int nfsmw_apply_app_patches(const struct elf32_image *app_image,
                             char *error, size_t error_size)
 {

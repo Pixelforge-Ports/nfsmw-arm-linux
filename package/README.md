@@ -28,3 +28,9 @@ Resolution is detected automatically, including 640x480, 720x480, 720x720, 1024x
 | Select + Start | Exit |
 
 Native controls remain enabled; gptokeyb2 handles the exit shortcut. See the source repository's KNOWN_ISSUES.md for the upstream car-selection workaround.
+
+The source also addresses FMOD error 48 on ARM64 firmware running this ARM32
+port by using the kernel's CPU-feature flags. Please test engine noises, menu
+effects and crash sounds after rebuilding. Music remains disabled because the
+original Android decoder is unsupported. If sound effects remain silent,
+include `logs/nfsmw.log` with your report.

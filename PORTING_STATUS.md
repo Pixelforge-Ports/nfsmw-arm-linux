@@ -1,6 +1,23 @@
 # Porting status
 
-Updated: 2026-08-10
+Updated: 2026-09-20
+
+## Pixelforge source update (not yet device-verified)
+
+The RG34XX-SP muOS log confirms FMOD output selection fails with result 48
+before the EventSystem is created. The verified donor's CPU detector at
+`libfmodex.so+0xbfe0c` parses `/proc/cpuinfo`; its output registration checks
+bits 2 (NEON) or 3 (VFP) and returns 48 when neither is present. The source
+now translates Linux ARM32 `AT_HWCAP` into this bundled detector's bit layout.
+Original instructions are checked before patching; unsupported donors fail
+instead of receiving an unchecked patch.
+
+The Continue/Buy control changes have been reverted; the existing controls and
+quick-A workaround remain unchanged. Only the sound fix is retained.
+
+No new runtime or archive was built for this update. Sound effects need a
+fresh handheld test.
+The following milestones and release hashes describe the upstream R36S alpha.
 
 ## Current state
 
