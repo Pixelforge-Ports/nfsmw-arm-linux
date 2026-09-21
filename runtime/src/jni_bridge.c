@@ -379,13 +379,13 @@ static float configured_performance_score(void)
 static int silent_audio_override(void)
 {
     static int initialized;
-    static int enabled = 1;
+    static int enabled = 0;
 
     if (initialized == 0) {
         const char *configured = getenv("NFSMW_SILENT_AUDIO");
 
-        if (configured != NULL && strcmp(configured, "0") == 0)
-            enabled = 0;
+        if (configured != NULL && strcmp(configured, "1") == 0)
+            enabled = 1;
         (void)printf("G8-SILENT user-music-override=%d\n", enabled);
         initialized = 1;
     }
