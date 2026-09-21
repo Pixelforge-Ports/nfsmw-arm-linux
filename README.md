@@ -21,8 +21,8 @@ Android libraries, or other Electronic Arts assets.
 - Career saves and multiple completed races
 - Clean exit back to PortMaster
 
-Soundtrack playback is disabled because the original Android decoder enters a
-retry loop on Linux and substantially reduces performance.
+The launcher enables the game soundtrack and menu audio by default. Set
+`NFSMW_SILENT_AUDIO=1` only when testing without the game's music player.
 
 ### Audio and text troubleshooting
 
@@ -32,7 +32,8 @@ now retries a rejected explicit output selection with FMOD's automatic mode.
 The hook covers both the C API and the C++ method imported by this game build.
 This fallback still needs handheld verification. Check `logs/nfsmw.log` for
 `G8-FMOD` selection results and `G8-AUDIOTRACK` mixer startup when reporting
-remaining silence. The fallback does not enable the disabled soundtrack.
+remaining silence. The launcher now reports the platform's music player as
+inactive so the game can start its own playlist.
 
 The fallback bitmap font now uses matching measurement, drawing and baseline
 bounds to prevent clipping. It remains a simple block font. Audio fallback and
@@ -45,8 +46,8 @@ tests -v` on Linux; font checks require `arm-linux-gnueabihf-gcc` and `qemu-arm`
    [`nfsmw-r36s-v0.1.0-alpha.zip`](https://github.com/Detoy/nfsmw-r36s/releases/tag/v0.1.0-alpha).
 2. Install it through PortMaster, or extract it at the root of the ROMs card.
 3. Copy your legally obtained APK and OBB to `ports/nfsmw/gamedata/`.
-4. Launch the port. First-run setup verifies the files and extracts the five
-   required ARMv7 libraries locally.
+4. Launch the port. First-run setup verifies the files, extracts the five
+   required ARMv7 libraries, and prepares the OBB sound files needed by FMOD.
 
 ### Supported game version
 
@@ -83,6 +84,12 @@ normally with D-pad and A.
 The runtime maps the original Android ARMv7 libraries, provides the required
 Bionic and JNI compatibility surface, translates the Android soft-float ABI,
 and hosts graphics, controller and audio output through Linux/SDL.
+
+FMOD reads menu effects and music from `gamefiles/published/sounds/`. These
+files are prepared from the owned OBB on first launch and reused afterwards.
+The compatibility bridge enlarges small Android thread-stack requests to fit
+Linux: FMOD's 8 KiB file-thread stack otherwise prevents streamed music and
+menu sounds from being created even when the audio files open successfully.
 
 To prepare a private local test directory from your own game files:
 
@@ -158,8 +165,8 @@ feature detector with Linux ARM32 `AT_HWCAP` detection. The reported
 `setOutput ... result=48` followed by `EventSystem is null` happens before
 sound banks load; changing volume or ALSA settings cannot repair that failure.
 The patch checks the donor instructions before applying and does not claim
-CPU features absent from the kernel. It targets sound effects; the Android
-soundtrack decoder remains disabled. After rebuilding, look for
+CPU features absent from the kernel. It enables FMOD sound output and the
+game's own soundtrack. After rebuilding, look for
 `G8-FMOD CPU HWCAP`, a successful `setOutput` result and an active
 `G8-AUDIOTRACK` mixer in `logs/nfsmw.log`. Device verification is still required.
 

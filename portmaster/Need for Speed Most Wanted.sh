@@ -51,6 +51,14 @@ if ! "$SETUP" "$GAMEDIR"; then
     exit 1
 fi
 
+if python3 "$GAMEDIR/prepare_audio.py" "$GAMEDIR"; then
+    export NFSMW_AUDIO_ROOT="$GAMEDIR/gamefiles"
+    export NFSMW_SILENT_AUDIO=${NFSMW_SILENT_AUDIO:-0}
+else
+    echo "NFS audio preparation failed; music is disabled for this launch"
+    export NFSMW_SILENT_AUDIO=1
+fi
+
 source "$GAMEDIR/runtime-env.sh"
 if ! nfsmw_runtime_environment; then
     command -v pm_finish >/dev/null 2>&1 && pm_finish
@@ -62,7 +70,6 @@ export SDL_NO_SIGNAL_HANDLERS=1
 export NFSMW_RUN_CONSTRUCTORS=1 NFSMW_RUN_JNI=1 NFSMW_RUN_GAME=1
 export NFSMW_TEST_FRAMES=0
 export NFSMW_PERFORMANCE_SCORE=${NFSMW_PERFORMANCE_SCORE:-20}
-export NFSMW_SILENT_AUDIO=${NFSMW_SILENT_AUDIO:-1}
 export NFSMW_AUDIO_OUTPUT=${NFSMW_AUDIO_OUTPUT:-1}
 export NFSMW_OBB_PATH="$GAMEDIR/gamefiles/main.1003128.com.ea.games.nfs13_row.obb"
 

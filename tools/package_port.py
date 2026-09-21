@@ -5,7 +5,7 @@ data=ROOT/'portmaster/nfsmw'; package=ROOT/'package'
 out=ROOT/'portmaster/dist/nfsmw.zip';out.parent.mkdir(exist_ok=True)
 entries=[(package/'Need for Speed Most Wanted.sh','Need for Speed Most Wanted.sh'),
          (ROOT/'runtime/build/nfsmw_mapper','nfsmw/nfsmw_runtime')]
-for name in ['setup.sh','runtime-env.sh','nfsmw.ini','nfsmw.eapx.json','eapx.py','README.md','port.json','gameinfo.xml','screenshot.png','cover.png']:
+for name in ['setup.sh','runtime-env.sh','prepare_audio.py','nfsmw.ini','nfsmw.eapx.json','eapx.py','README.md','port.json','gameinfo.xml','screenshot.png','cover.png']:
     entries.append((data/name,'nfsmw/'+name))
 for path in sorted((data/'licenses').iterdir()): entries.append((path,'nfsmw/licenses/'+path.name))
 entries.append((data/'gamedata/README.txt','nfsmw/gamedata/README.txt'))

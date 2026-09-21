@@ -2,6 +2,7 @@
 #include "relocation_probe.h"
 
 #include "compat_bridge.h"
+#include "fmod_filesystem.h"
 #include "softfp_symbols.h"
 #include "symbol_probe.h"
 #include "fmod_output.h"
@@ -27,6 +28,26 @@ static void *nfsmw_dso_handle;
 static void *retained_host_handles[RELOCATION_HOST_CAPACITY];
 static size_t retained_host_count;
 static nfsmw_fmod_set_output_fn guest_set_output[2];
+static nfsmw_fmod_set_filesystem_fn guest_set_filesystem;
+typedef int (*nfsmw_create_sound_fn)(void *, const char *, unsigned int,
+                                     void *, void **);
+static nfsmw_create_sound_fn guest_create_sound;
+
+static int compatible_create_sound(void *system, const char *name,
+                                    unsigned int mode, void *info, void **sound)
+{
+    static atomic_uint reported;
+    int result = guest_create_sound(system, name, mode, info, sound);
+    unsigned int count = atomic_load(&reported);
+
+    while (count < 8U) {
+        if (atomic_compare_exchange_weak(&reported, &count, count + 1U)) {
+            (void)printf("G8-FMOD createSound result=%d mode=0x%x\n", result, mode);
+            break;
+        }
+    }
+    return result;
+}
 
 static int compatible_set_output(void *system, int output)
 {
@@ -36,6 +57,22 @@ static int compatible_set_output(void *system, int output)
 static int compatible_cpp_set_output(void *system, int output)
 {
     return nfsmw_fmod_select_output(guest_set_output[1], system, output);
+}
+
+static int compatible_set_filesystem(
+    void *system, nfsmw_fmod_file_open_fn open,
+    nfsmw_fmod_file_close_fn close, nfsmw_fmod_file_read_fn read,
+    nfsmw_fmod_file_seek_fn seek, nfsmw_fmod_file_async_read_fn async_read,
+    nfsmw_fmod_file_async_cancel_fn async_cancel, int block_align)
+{
+    (void)open;
+    (void)close;
+    (void)read;
+    (void)seek;
+    (void)async_read;
+    (void)async_cancel;
+    return nfsmw_fmod_install_filesystem(guest_set_filesystem, system,
+                                         block_align);
 }
 
 static void nfsmw_android_assert2(const char *file, int line,
@@ -171,6 +208,28 @@ static uintptr_t relocation_lookup(const char *name, unsigned int binding,
                 (void)memcpy(&address, &wrapper, sizeof(address));
                 (void)printf("G8-FMOD output selection fallback installed: %s\n",
                              name);
+            }
+            if (strcmp(name,
+                       "_ZN4FMOD6System13setFileSystemEPF11FMOD_RESULTPKciPjPPvS6_EPFS1_S5_S5_EPFS1_S5_S5_jS4_S5_EPFS1_S5_jS5_EPFS1_P18FMOD_ASYNCREADINFOS5_ESA_i") == 0 &&
+                context->images[context->current_image].soname != NULL &&
+                strcmp(context->images[context->current_image].soname,
+                       "libapp.so") == 0 &&
+                sizeof(guest_set_filesystem) == sizeof(address)) {
+                nfsmw_fmod_set_filesystem_fn wrapper = compatible_set_filesystem;
+
+                (void)memcpy(&guest_set_filesystem, &address,
+                             sizeof(address));
+                (void)memcpy(&address, &wrapper, sizeof(address));
+                (void)printf("G8-FMOD native sound filesystem installed\n");
+            }
+            if (strcmp(name,
+                       "_ZN4FMOD6System11createSoundEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE") == 0 &&
+                context->images[context->current_image].soname != NULL &&
+                strcmp(context->images[context->current_image].soname, "libapp.so") == 0 &&
+                sizeof(guest_create_sound) == sizeof(address)) {
+                nfsmw_create_sound_fn wrapper = compatible_create_sound;
+                (void)memcpy(&guest_create_sound, &address, sizeof(address));
+                (void)memcpy(&address, &wrapper, sizeof(address));
             }
             return address;
         }

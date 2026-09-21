@@ -26,12 +26,21 @@ The RG34XX-SP muOS log shows successful SDL/ALSA startup followed by FMOD
 error 48 and a null EventSystem. The bundled CPU detector parses Android-era
 `/proc/cpuinfo`; the updated source uses the ARM32 process's Linux HWCAP flags.
 The patch checks the donor instructions before changing the detector.
-Sound effects are not yet confirmed fixed on muOS; device testing is required.
+Race sound effects are now reported working on muOS. Menu effects use the
+streaming path described below and still need a new device test.
 
 ## Music
 
-Music is disabled because the original Android decoder
-fails and retries continuously on Linux, causing a large performance loss.
+The latest muOS log shows successful music and menu-bank file opens followed
+by FMOD internal error 33. The bundled FMOD file thread requests an 8 KiB
+stack, which is too small for glibc. The compatibility bridge now gives
+host-allocated threads at least 64 KiB (or the host minimum, if larger),
+without enlarging caller-supplied memory. Music and menu playback with this
+change still need confirmation on the handheld.
+
+The launcher now enables the Android soundtrack by default. If music needs to
+be disabled for a specific device test, set `NFSMW_SILENT_AUDIO=1` before
+launching and include `logs/nfsmw.log` in the report.
 
 ## Experimental cursor
 

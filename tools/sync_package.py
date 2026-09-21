@@ -8,7 +8,7 @@ def sync():
         shutil.copyfile(data/name,out/name)
     shutil.copyfile(ROOT/'testing_thread.txt',out/'testing_thread.txt')
     shutil.copyfile(ROOT/'portmaster/Need for Speed Most Wanted.sh',out/'Need for Speed Most Wanted.sh')
-    for name in ['setup.sh','runtime-env.sh','nfsmw.ini','nfsmw.eapx.json','README.md']:
+    for name in ['setup.sh','runtime-env.sh','prepare_audio.py','nfsmw.ini','nfsmw.eapx.json','README.md']:
         shutil.copyfile(data/name,game/name)
     shutil.copytree(data/'licenses',game/'licenses',dirs_exist_ok=True)
     shutil.copyfile(ROOT/'tools/eapx.py',data/'eapx.py')

@@ -892,7 +892,19 @@ static int host_attr(const struct bionic_pthread_attr32 *guest,
         result = pthread_attr_setstack(host, guest->stack_base,
                                        guest->stack_size);
     } else if (guest->stack_size != 0U) {
-        result = pthread_attr_setstacksize(host, guest->stack_size);
+        size_t stack_size = guest->stack_size;
+        size_t minimum = 64U * 1024U;
+
+        /* FMOD's file thread requests 8 KiB, below glibc's minimum.
+         * Host callbacks also need more stack than their Bionic equivalents.
+         * Only enlarge stacks allocated by pthread, never caller memory. */
+        if (minimum < (size_t)PTHREAD_STACK_MIN) {
+            minimum = (size_t)PTHREAD_STACK_MIN;
+        }
+        if (stack_size < minimum) {
+            stack_size = minimum;
+        }
+        result = pthread_attr_setstacksize(host, stack_size);
     }
     if (result == 0 && (guest->flags & 1U) != 0U) {
         result = pthread_attr_setdetachstate(host, PTHREAD_CREATE_DETACHED);

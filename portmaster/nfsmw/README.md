@@ -5,7 +5,7 @@ Based on [Detoy's port](https://github.com/Detoy/nfsmw-r36s). Display, setup and
 
 ## Installation
 
-Put `nfsmw.zip` in PortMaster's autoinstall folder and run PortMaster. Copy your owned Android **1.3.128 (1003128)** APK and `main.1003128.com.ea.games.nfs13_row.obb` to `ports/nfsmw/gamedata/`. Launch from Ports. eapx verifies all five native libraries against the upstream hashes and the complete OBB against SHA-256 before publishing the installation. First launch shows stages and percentage; allow space for an additional copy of the OBB. Keep the device powered on. Setup logs are in `eapx.log`; game logs are in `logs/nfsmw.log`.
+Put `nfsmw.zip` in PortMaster's autoinstall folder and run PortMaster. Copy your owned Android **1.3.128 (1003128)** APK and `main.1003128.com.ea.games.nfs13_row.obb` to `ports/nfsmw/gamedata/`. Launch from Ports. eapx verifies all five native libraries against the upstream hashes and the complete OBB against SHA-256 before publishing the installation. First launch also prepares the OBB sound files used for music and menu effects, so allow extra SD-card space and keep the device powered on. Setup logs are in `eapx.log`; game logs are in `logs/nfsmw.log`.
 
 The installed OBB lives in `gamefiles/`. Once setup succeeds, the original APK and OBB in `gamedata/` can be removed. Existing saves in `files/` remain untouched.
 
@@ -29,8 +29,8 @@ Resolution is detected automatically, including 640x480, 720x480, 720x720, 1024x
 
 Native controls remain enabled; gptokeyb2 handles the exit shortcut. See the source repository's KNOWN_ISSUES.md for the upstream car-selection workaround.
 
-The source also addresses FMOD error 48 on ARM64 firmware running this ARM32
-port by using the kernel's CPU-feature flags. Please test engine noises, menu
-effects and crash sounds after rebuilding. Music remains disabled because the
-original Android decoder is unsupported. If sound effects remain silent,
-include `logs/nfsmw.log` with your report.
+The source addresses FMOD error 48 on ARM64 firmware running this ARM32 port
+by using the kernel's CPU-feature flags. FMOD uses native file callbacks for
+the prepared sound files. Please test music, menu effects, engine noises and
+crash sounds after rebuilding. If sound effects remain silent, include
+`logs/nfsmw.log` with your report.

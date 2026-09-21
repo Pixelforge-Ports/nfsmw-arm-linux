@@ -1,6 +1,6 @@
 # Porting status
 
-Updated: 2026-09-20
+Updated: 2026-09-22
 
 ## Pixelforge source update (not yet device-verified)
 
@@ -15,8 +15,12 @@ instead of receiving an unchecked patch.
 The Continue/Buy control changes have been reverted; the existing controls and
 quick-A workaround remain unchanged. Only the sound fix is retained.
 
-No new runtime or archive was built for this update. Sound effects need a
-fresh handheld test.
+Race sound effects are now reported working on muOS. The latest log confirms
+the sound output and native filesystem initialize successfully, but music and
+menu effects still fail when FMOD creates its file thread. The compatibility
+bridge now enlarges its 8 KiB stack request to at least 64 KiB for glibc.
+No new game runtime or archive was built for this update. Streamed audio needs
+a fresh handheld test.
 The following milestones and release hashes describe the upstream R36S alpha.
 
 ## Current state
@@ -85,11 +89,36 @@ Approaches already ruled out:
 See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) and
 [issue #1](https://github.com/Detoy/nfsmw-r36s/issues/1).
 
-### Music
+### Music and menu audio
 
-The original Android music decoder fails and retries continuously on Linux,
-roughly halving performance. Music remains disabled while the working sound
-effects path is preserved.
+The launcher enables the playlist after preparing audio from the owned OBB.
+Native FMOD callbacks accept both `published/sounds/` and `sounds/` paths.
+They use this donor's error codes (EOF 22, missing file 23) and report EOF on
+short reads. ARM callback tests cover both path forms, reads, EOF, seeking
+after EOF and missing files. Full music and menu playback still need device
+verification.
+
+The new log confirms successful MP3 and UI-bank opens but sound creation
+returns internal error 33. In the supported donor, the file-buffer setup
+starts `FMOD file thread` with an 8192-byte stack. Its pthread failure is
+returned as error 33. Linux rejects that stack size; the bridge now raises
+host-allocated stacks to at least 64 KiB and `PTHREAD_STACK_MIN`. Explicit
+caller-supplied stacks keep their original address and size.
+The focused ARM regression test creates and joins the 8 KiB guest request,
+and checks that larger requests, caller-owned stacks and detached attributes
+are preserved. It passes with the corrected bridge.
+
+An isolated ARM test loads the owned FMOD library and creates streams from
+`loading_01.mp3` and `ui/ui.fsb` with mode `0xa0`. Both return error 33 with
+the previous stack handling, and both return success with valid sound handles
+after the stack fix. The test uses FMOD's no-sound output, so it verifies sound
+creation rather than audible playback or handheld performance.
+
+Diagnostics are capped per launch: twelve successful opens, twelve failed
+opens and eight `createSound` results. An open result of zero confirms file
+access; a `createSound` result of zero confirms sound creation. Neither alone
+proves audible playback. Error 33 in this FMOD version means internal error,
+not missing file.
 
 ### Wider device testing
 

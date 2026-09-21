@@ -170,23 +170,54 @@ const char *nfsmw_obb_path(void)
 int64_t nfsmw_obb_asset_size(const char *path)
 {
     const char *wanted = normalize(path);
+    static const char *const prefixes[] = {
+        "", "published/", "published.1x/"
+    };
     size_t index;
-    size_t length = strlen(wanted);
+    size_t prefix_index;
 
-    while (length > 0U && wanted[length - 1U] == '/') {
-        --length;
-    }
-    for (index = 0U; index < entry_count; ++index) {
-        size_t entry_length = strlen(entries[index].name);
-        size_t comparable = entry_length;
+    for (prefix_index = 0U;
+         prefix_index < sizeof(prefixes) / sizeof(prefixes[0]);
+         ++prefix_index) {
+        const char *prefix = prefixes[prefix_index];
+        const size_t prefix_length = strlen(prefix);
+        const size_t wanted_length = strlen(wanted);
+        size_t length;
 
-        if (comparable > 0U && entries[index].name[comparable - 1U] == '/') {
-            --comparable;
+        if (prefix_length > 0U &&
+            strncmp(wanted, prefix, prefix_length) == 0) {
+            continue;
         }
-        if (comparable == length &&
-            memcmp(entries[index].name, wanted, length) == 0) {
-            return entries[index].directory != 0 ? -1 :
-                   (int64_t)entries[index].size;
+        if (prefix_length + wanted_length >= NAME_LIMIT) {
+            continue;
+        }
+        length = prefix_length + wanted_length;
+        while (length > prefix_length &&
+               (prefix_length == 0U ? wanted[length - 1U] :
+                wanted[length - prefix_length - 1U]) == '/') {
+            --length;
+        }
+        for (index = 0U; index < entry_count; ++index) {
+            const char *entry_name = entries[index].name;
+            size_t entry_length = strlen(entry_name);
+            size_t comparable = entry_length;
+            int matches;
+
+            if (comparable > 0U && entry_name[comparable - 1U] == '/') {
+                --comparable;
+            }
+            if (comparable != length) {
+                continue;
+            }
+            matches = prefix_length == 0U ?
+                memcmp(entry_name, wanted, length) == 0 :
+                memcmp(entry_name, prefix, prefix_length) == 0 &&
+                memcmp(entry_name + prefix_length, wanted,
+                       length - prefix_length) == 0;
+            if (matches != 0) {
+                return entries[index].directory != 0 ? -1 :
+                       (int64_t)entries[index].size;
+            }
         }
     }
     return -2;
