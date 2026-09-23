@@ -1990,13 +1990,16 @@ int nfsmw_jni_run(const struct elf32_image *fmod_image,
     int have_previous_axes = 0;
     int cursor_x = nfsmw_display_width() / 2;
     int cursor_y = nfsmw_display_height() / 2;
-    int cursor_visible = 0;
+    int cursor_visible = 1;
     int touch_down = 0;
+    int scroll_touch_down = 0;
+    int gameplay_mode_used = 0;
     unsigned int last_motion_log = 0U;
     unsigned int last_direct_log = 0U;
     int previous_direct_raw = 0;
     unsigned int frame_limit = 18000U;
     unsigned int start_ticks;
+    unsigned int last_cursor_activity;
     unsigned int frame;
     struct fake_object fmod_buffer = {
         .magic = FAKE_MAGIC, .kind = FAKE_DIRECT_BUFFER
@@ -2075,9 +2078,10 @@ int nfsmw_jni_run(const struct elf32_image *fmod_image,
     (void)printf("=== G6/G7 GAME LOOP (Back+Start exits) ===\n");
     (void)printf("G6-MOGA steering=direct-guest-state deadzone=4096 "
                  "jni-payload=-1/0/+1\n");
-    (void)printf("G6-TOUCH fallback-toggle=Select\n");
+    (void)printf("G6-TOUCH default=mouse Select=mode-toggle Start=pause-resume-mode\n");
     (void)printf("G6-MOGA D-pad=native-key-only analog=independent-X/Y\n");
     start_ticks = nfsmw_platform_runtime_ticks();
+    last_cursor_activity = start_ticks;
     controller_state = controller_instance();
     if (controller_state == NULL) {
         (void)snprintf(error, error_size,
@@ -2092,8 +2096,41 @@ int nfsmw_jni_run(const struct elf32_image *fmod_image,
         int axes_changed = have_previous_axes == 0;
         const int raw_steering = (int)axes[0];
         const int raw_vertical = (int)axes[1];
+        const int raw_right_x = (int)axes[2];
+        const int raw_right_y = (int)axes[3];
+        const int raw_left_trigger = (int)axes[4];
+        const int raw_right_trigger = (int)axes[5];
         float direct_steering = 0.0F;
         float direct_vertical = 0.0F;
+
+        if (cursor_visible != 0) {
+            int input_active = 0;
+            unsigned int now = nfsmw_platform_runtime_ticks();
+
+            for (index = 0U; index < 15U; ++index) {
+                if (buttons[index] != 0U) input_active = 1;
+            }
+            if (raw_steering > 4096 || raw_steering < -4096 ||
+                raw_vertical > 4096 || raw_vertical < -4096 ||
+                raw_right_x > 8192 || raw_right_x < -8192 ||
+                raw_right_y > 8192 || raw_right_y < -8192 ||
+                raw_left_trigger > 12288 || raw_right_trigger > 12288)
+                input_active = 1;
+            if (input_active != 0) {
+                last_cursor_activity = now;
+            } else if ((unsigned int)(now - last_cursor_activity) >= 15000U) {
+                if (touch_down != 0 || scroll_touch_down != 0) {
+                    touch(&jni_handle, &surface_view, 1, 0,
+                          (float)cursor_x, (float)cursor_y);
+                    touch_down = 0;
+                    scroll_touch_down = 0;
+                }
+                cursor_visible = 0;
+                gameplay_mode_used = 1;
+                (void)printf("G6-TOUCH cursor=off frame=%u reason=15s-idle\n",
+                             frame);
+            }
+        }
 
         /* This mobile control scheme auto-accelerates and uses only X for
          * steering. Brake/reverse remains on L1 as the title expects, while
@@ -2146,8 +2183,19 @@ int nfsmw_jni_run(const struct elf32_image *fmod_image,
         axes[2] = 0;
         axes[3] = 0;
         if (cursor_visible != 0) {
+            int scroll_dx = -raw_right_x / 8192;
+            int scroll_dy = -raw_right_y / 8192;
             int cursor_dx = raw_steering / 4096;
             int cursor_dy = raw_vertical / 4096;
+
+            if (buttons[9] != 0U) scroll_dx -= 4;
+            if (buttons[10] != 0U) scroll_dx += 4;
+            if (raw_left_trigger > 12288) scroll_dy -= 4;
+            if (raw_right_trigger > 12288) scroll_dy += 4;
+            if (scroll_dx < -8) scroll_dx = -8;
+            if (scroll_dx > 8) scroll_dx = 8;
+            if (scroll_dy < -8) scroll_dy = -8;
+            if (scroll_dy > 8) scroll_dy = 8;
             if (buttons[13] != 0U) cursor_dx = -8;
             else if (buttons[14] != 0U) cursor_dx = 8;
             if (buttons[11] != 0U) cursor_dy = -8;
@@ -2160,6 +2208,36 @@ int nfsmw_jni_run(const struct elf32_image *fmod_image,
             if (cursor_y > nfsmw_display_height() - 9) cursor_y = nfsmw_display_height() - 9;
             direct_steering = 0.0F;
             direct_vertical = 0.0F;
+            axes[4] = 0;
+            axes[5] = 0;
+
+            if (scroll_dx != 0 || scroll_dy != 0) {
+                if (touch_down != 0) {
+                    touch(&jni_handle, &surface_view, 1, 0,
+                          (float)cursor_x, (float)cursor_y);
+                    touch_down = 0;
+                }
+                if (scroll_touch_down == 0) {
+                    touch(&jni_handle, &surface_view, 0, 0,
+                          (float)cursor_x, (float)cursor_y);
+                    scroll_touch_down = 1;
+                }
+                cursor_x += scroll_dx;
+                cursor_y += scroll_dy;
+                if (cursor_x < 8) cursor_x = 8;
+                if (cursor_x > nfsmw_display_width() - 9) cursor_x = nfsmw_display_width() - 9;
+                if (cursor_y < 8) cursor_y = 8;
+                if (cursor_y > nfsmw_display_height() - 9) cursor_y = nfsmw_display_height() - 9;
+                touch(&jni_handle, &surface_view, 2, 0,
+                      (float)cursor_x, (float)cursor_y);
+            } else if (scroll_touch_down != 0) {
+                touch(&jni_handle, &surface_view, 1, 0,
+                      (float)cursor_x, (float)cursor_y);
+                scroll_touch_down = 0;
+            }
+        } else {
+            if (buttons[13] != 0U) direct_steering = -1.0F;
+            else if (buttons[14] != 0U) direct_steering = 1.0F;
         }
 
         for (index = 0U; index < 6U; ++index) {
@@ -2207,18 +2285,43 @@ int nfsmw_jni_run(const struct elf32_image *fmod_image,
                 if (buttons[index] != 0U && index == 4U &&
                     buttons[6] == 0U) {
                     cursor_visible = cursor_visible == 0;
+                    if (cursor_visible != 0)
+                        last_cursor_activity = nfsmw_platform_runtime_ticks();
                     if (cursor_visible == 0 && touch_down != 0) {
                         touch(&jni_handle, &surface_view, 1, 0,
                               (float)cursor_x, (float)cursor_y);
                         touch_down = 0;
                     }
+                    if (cursor_visible == 0) gameplay_mode_used = 1;
+                    if (scroll_touch_down != 0) {
+                        touch(&jni_handle, &surface_view, 1, 0,
+                              (float)cursor_x, (float)cursor_y);
+                        scroll_touch_down = 0;
+                    }
                     (void)printf("G6-TOUCH cursor=%s frame=%u position=%d,%d\n",
                                  cursor_visible != 0 ? "on" : "off", frame,
                                  cursor_x, cursor_y);
                 }
+                if (buttons[index] != 0U && index == 6U &&
+                    gameplay_mode_used != 0) {
+                    cursor_visible = cursor_visible == 0;
+                    if (cursor_visible != 0)
+                        last_cursor_activity = nfsmw_platform_runtime_ticks();
+                    if (cursor_visible == 0 && touch_down != 0) {
+                        touch(&jni_handle, &surface_view, 1, 0,
+                              (float)cursor_x, (float)cursor_y);
+                        touch_down = 0;
+                    }
+                    if (scroll_touch_down != 0) {
+                        touch(&jni_handle, &surface_view, 1, 0,
+                              (float)cursor_x, (float)cursor_y);
+                        scroll_touch_down = 0;
+                    }
+                    (void)printf("G6-TOUCH cursor=%s frame=%u reason=start\n",
+                                 cursor_visible != 0 ? "on" : "off", frame);
+                }
                 send_moga_key = index != 4U &&
-                    !(cursor_visible != 0 &&
-                      (index == 0U || index >= 11U));
+                    !(cursor_visible != 0 && index != 1U && index != 6U);
                 if (send_moga_key != 0) {
                     struct fake_object *event = new_moga_event(
                         FAKE_MOGA_KEY_EVENT, buttons[index] != 0U ? 0 : 1,
@@ -2237,18 +2340,12 @@ int nfsmw_jni_run(const struct elf32_image *fmod_image,
                                  cursor_visible);
                 }
                 if (buttons[index] != 0U && cursor_visible != 0 &&
-                    (index == 9U || index == 10U)) {
-                    if (touch_down != 0) {
+                    index == 0U && touch_down == 0) {
+                    if (scroll_touch_down != 0) {
                         touch(&jni_handle, &surface_view, 1, 0,
                               (float)cursor_x, (float)cursor_y);
-                        touch_down = 0;
+                        scroll_touch_down = 0;
                     }
-                    cursor_visible = 0;
-                    (void)printf("G6-TOUCH cursor=auto-off frame=%u reason=shoulder\n",
-                                 frame);
-                }
-                if (buttons[index] != 0U && cursor_visible != 0 &&
-                    index == 0U && touch_down == 0) {
                     touch(&jni_handle, &surface_view, 0, 0,
                           (float)cursor_x, (float)cursor_y);
                     touch_down = 1;

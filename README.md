@@ -65,15 +65,24 @@ Files from other releases and similarly named repacks are not compatible.
 
 | Control | Action |
 |---|---|
-| Left stick | Steering and map movement |
-| D-pad | Menu navigation |
-| A | Accept / drift |
+| Left stick | Move the menu cursor; steer while driving |
+| D-pad | Move the menu cursor; steer while driving |
+| Right stick | Drag-scroll menus and pan the city map |
+| A | Click in mouse mode; existing game action while driving |
 | B | Back |
-| L1 | Brake / reverse |
-| R1 | Nitrous |
-| L1 / R1 in menus | Change top-level section |
-| Start | Pause / select map event |
+| L1 / R1 | Scroll the menu or map horizontally; existing driving actions while driving |
+| L2 / R2 | Scroll the menu or map vertically |
+| Select | Switch between mouse-menu and driving controls |
+| Start | Pause while driving; switch back to driving from a pause menu |
 | Select + Start | Exit to PortMaster |
+
+The cursor starts visible for menus. If mouse mode receives no button, stick,
+or trigger input for 15 seconds, it automatically hides and normal gamepad
+controls take over. Any input restarts the timer. Select remains the manual
+mode switch; Start opens mouse controls on pause, and Start again resumes
+driving. Race-finish screens may require Select to return to mouse mode. A and
+scrolling use synthetic touch events; this control path still needs handheld
+verification.
 
 On the pre-race car-selection or purchase screen, use the workaround described
 in [KNOWN_ISSUES.md](KNOWN_ISSUES.md). The following modifications screen works

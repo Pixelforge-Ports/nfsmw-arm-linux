@@ -17,15 +17,23 @@ Resolution is detected automatically, including 640x480, 720x480, 720x720, 1024x
 
 | Button | Action |
 |---|---|
-| Left stick | Steering / map movement |
-| D-pad | Menu navigation |
-| A | Accept / drift |
+| Left stick | Move the menu cursor; steer while driving |
+| D-pad | Move the menu cursor; steer while driving |
+| Right stick | Drag-scroll menus and pan the city map |
+| A | Click in mouse mode; existing game action while driving |
 | B | Back |
-| L1 | Brake / reverse |
-| R1 | Nitrous |
-| L1 / R1 in menus | Change section |
-| Start | Pause / select event |
+| L1 / R1 | Scroll the menu or map horizontally; existing driving actions while driving |
+| L2 / R2 | Scroll the menu or map vertically |
+| Select | Switch between mouse-menu and driving controls |
+| Start | Pause while driving; switch back to driving from a pause menu |
 | Select + Start | Exit |
+
+The cursor starts visible for menus. If mouse mode receives no button, stick,
+or trigger input for 15 seconds, it automatically hides and normal gamepad
+controls take over. Any input restarts the timer. Select remains the manual
+mode switch; Start opens mouse controls on pause, and Start again resumes
+driving. Race-finish screens may require Select to return to mouse mode.
+Synthetic touch controls need handheld verification.
 
 Native controls remain enabled; gptokeyb2 handles the exit shortcut. See the source repository's KNOWN_ISSUES.md for the upstream car-selection workaround.
 

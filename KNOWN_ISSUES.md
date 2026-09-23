@@ -42,10 +42,21 @@ The launcher now enables the Android soundtrack by default. If music needs to
 be disabled for a specific device test, set `NFSMW_SILENT_AUDIO=1` before
 launching and include `logs/nfsmw.log` in the report.
 
-## Experimental cursor
+## Experimental menu mouse controls
 
-Select toggles a development cursor, but taps are rejected by the game. It is
-not a functional control method in this alpha.
+Menus now start in mouse mode. The D-pad and left stick move the cursor, A sends
+a tap, B sends Back, L1/R1 drag horizontally, L2/R2 drag vertically, and the
+right stick pans by sending a drag gesture. Select switches to driving
+controls; in driving mode, left/right D-pad also steer. Mouse mode automatically
+switches to normal gamepad controls after 15 seconds without button, stick, or
+trigger activity. Any input restarts the timer. Start switches to mouse mode
+when pausing and back to driving when resuming after Select has enabled driving
+mode.
+
+The runtime does not yet have a verified screen-state signal, so the race start
+and finish transitions are not switched automatically. Synthetic touch events
+also need confirmation on the handheld; if the game rejects a tap, use Select
+to switch modes and the existing gamepad menu controls.
 
 When reporting a problem, include your handheld, firmware, release version,
 exact reproduction steps and the relevant part of `ports/nfsmw/logs/nfsmw.log`.
