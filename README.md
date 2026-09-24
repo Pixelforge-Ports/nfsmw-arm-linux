@@ -21,6 +21,9 @@ Android libraries, or other Electronic Arts assets.
 - Career saves and multiple completed races
 - Clean exit back to PortMaster
 
+The graphics-provider selection regression check runs on Linux with
+`bash tests/test_rocknix_gl_selection.sh`.
+
 The launcher enables the game soundtrack and menu audio by default. Set
 `NFSMW_SILENT_AUDIO=1` only when testing without the game's music player.
 
@@ -180,5 +183,18 @@ game's own soundtrack. After rebuilding, look for
 `G8-AUDIOTRACK` mixer in `logs/nfsmw.log`. Device verification is still required.
 
 The launcher probes the firmware's ARM32 EGL/GLES pair, including `/usr/lib32` and `/lib32`, before starting the game. It uses the firmware's video driver selection and sets the 32-bit PipeWire/SPA module directories where present. The graphics startup check accepts the actual display size instead of requiring 640x480.
+
+### ROCKNIX RG DS graphics
+
+On a Wayland session, the launcher now checks Mesa EGL/GLES pairs outside
+`mali/` directories before testing the proprietary Mali libraries. This is
+intended for ROCKNIX Panfrost, where the old selection chose
+`/usr/lib32/mali/libEGL.so` and the graphics preflight reported `No mali
+devices found`. The new RG DS log confirms `mode=wayland-mesa` and
+`G5-HOST PASS`. Startup then exposed unresolved ARM EABI and GLES extension
+symbols, so the runtime now maps ARM helpers from libgcc and asks EGL for GLES
+extension entry points. Rebuild and test again; the next expected markers are
+`G3 FULL RELOCATION PASS` and `G4-CTOR PASS`. If Mesa libraries are found but
+cannot create a Wayland window, startup stops instead of retrying the Mali pair.
 
 The reported RG34XX-SP log confirms glibc compatibility and successful game-data import; the graphics/audio startup changes still need a device test. Rebuild and update the launcher, runtime and `runtime-env.sh` together. Keep `gamefiles/`, `files/`, and `.eapx-nfsmw-data.json` when updating so validated data and saves are retained.

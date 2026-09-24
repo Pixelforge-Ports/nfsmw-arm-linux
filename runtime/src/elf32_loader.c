@@ -346,6 +346,11 @@ static int apply_relocations(struct elf32_image *image,
                 if (*first_unresolved == NULL) {
                     *first_unresolved = unresolved;
                 }
+                (void)fprintf(stderr,
+                              "G3-REL unresolved module=%s symbol=%s type=%u\n",
+                              image->soname != NULL ? image->soname : "unknown",
+                              unresolved != NULL ? unresolved : "unknown",
+                              type);
                 continue;
             }
             value = type == R_ARM_ABS32 ?

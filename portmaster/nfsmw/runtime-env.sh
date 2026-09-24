@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 nfsmw_runtime_environment() {
-    local library_dirs directory egl gles blob chosen_egl= chosen_gles=
+    local library_dirs directory egl gles blob chosen_egl= chosen_gles= graphics_mode=automatic
+    local runtime_dir socket wayland_socket= mesa_pass mesa_candidate=0
     library_dirs=${NFSMW_LIBRARY_DIRS:-/usr/local/lib/arm-linux-gnueabihf:/usr/lib/arm-linux-gnueabihf:/usr/lib/arm-linux-gnueabihf/mali:/lib/arm-linux-gnueabihf:/usr/lib32/mali:/usr/lib32:/lib32}
     if [ "${DEVICE_ARCH:-}" = armhf ]; then library_dirs="$library_dirs:/usr/lib:/lib"; fi
     local -a directories
@@ -14,7 +15,52 @@ nfsmw_runtime_environment() {
         "$GAMEDIR/nfsmw_runtime" --probe-gl "$SDL_VIDEO_EGL_DRIVER" "$SDL_VIDEO_GL_DRIVER"; then
         chosen_egl=$SDL_VIDEO_EGL_DRIVER
         chosen_gles=$SDL_VIDEO_GL_DRIVER
+        graphics_mode=manual
     fi
+
+    for runtime_dir in "${XDG_RUNTIME_DIR:-}" "/run/user/$(id -u)" /run/user/0 /var/run/0-runtime-dir; do
+        [ -n "$runtime_dir" ] || continue
+        for socket in "$runtime_dir"/wayland-*; do
+            [ -S "$socket" ] || continue
+            wayland_socket=$socket
+            break 2
+        done
+    done
+
+    if [ -n "$wayland_socket" ] && [ -z "$chosen_egl" ]; then
+        echo "Graphics: Wayland session ($wayland_socket); trying Mesa EGL/GLES before Mali libraries"
+        for mesa_pass in marked versioned unversioned; do
+            for directory in "${directories[@]}"; do
+                case "$directory" in */mali) continue ;; esac
+                if [ "$mesa_pass" = unversioned ]; then
+                    egl="$directory/libEGL.so"
+                    gles="$directory/libGLESv2.so"
+                else
+                    egl="$directory/libEGL.so.1"
+                    gles="$directory/libGLESv2.so.2"
+                fi
+                [ -e "$egl" ] && [ -e "$gles" ] || continue
+                if [ "$mesa_pass" = marked ]; then
+                    [ -e "$directory/libEGL_mesa.so.0" ] || continue
+                elif [ "$mesa_pass" = versioned ]; then
+                    [ ! -e "$directory/libEGL_mesa.so.0" ] || continue
+                fi
+                mesa_candidate=1
+                echo "Graphics: testing Wayland Mesa EGL=$egl GLES2=$gles"
+                if "$GAMEDIR/nfsmw_runtime" --probe-gl "$egl" "$gles"; then
+                    chosen_egl=$egl
+                    chosen_gles=$gles
+                    graphics_mode=wayland-mesa
+                    break 2
+                fi
+            done
+        done
+        if [ -z "$chosen_egl" ] && [ "$mesa_candidate" -ne 0 ]; then
+            echo "Wayland Mesa EGL/GLES candidates failed the window preflight; refusing the Mali fallback."
+            return 1
+        fi
+    fi
+
     for directory in "${directories[@]}"; do
         [ -z "$chosen_egl" ] || break
         for egl in "$directory/libEGL.so" "$directory/libEGL.so.1"; do
@@ -22,7 +68,10 @@ nfsmw_runtime_environment() {
             for gles in "$directory/libGLESv2.so" "$directory/libGLESv2.so.2"; do
                 [ -e "$gles" ] || continue
                 if "$GAMEDIR/nfsmw_runtime" --probe-gl "$egl" "$gles"; then
-                    chosen_egl=$egl; chosen_gles=$gles; break 2
+                    chosen_egl=$egl
+                    chosen_gles=$gles
+                    graphics_mode=probed
+                    break 2
                 fi
             done
         done
@@ -32,7 +81,10 @@ nfsmw_runtime_environment() {
             for blob in "$directory"/libmali*.so* "$directory"/libMali.so*; do
                 [ -e "$blob" ] || continue
                 if "$GAMEDIR/nfsmw_runtime" --probe-gl "$blob" "$blob"; then
-                    chosen_egl=$blob; chosen_gles=$blob; break 2
+                    chosen_egl=$blob
+                    chosen_gles=$blob
+                    graphics_mode=probed
+                    break 2
                 fi
             done
         done
@@ -48,7 +100,7 @@ nfsmw_runtime_environment() {
     ln -s "$chosen_gles" "$GL_SHIM/libGLESv2.so.2"
     export LD_LIBRARY_PATH="$GL_SHIM:$LD_LIBRARY_PATH"
     export SDL_VIDEO_EGL_DRIVER="$chosen_egl" SDL_VIDEO_GL_DRIVER="$chosen_gles"
-    echo "Graphics: EGL=$chosen_egl GLES2=$chosen_gles SDL=${SDL_VIDEODRIVER:-auto}"
+    echo "Graphics: EGL=$chosen_egl GLES2=$chosen_gles SDL=${SDL_VIDEODRIVER:-auto} mode=$graphics_mode"
 
     local pipewire_dir= pulse_socket= runtime_dir
     for directory in "${directories[@]}"; do

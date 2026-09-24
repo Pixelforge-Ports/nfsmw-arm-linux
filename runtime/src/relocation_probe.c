@@ -16,13 +16,30 @@
 
 enum { RELOCATION_HOST_CAPACITY = 8 };
 
+typedef void (*nfsmw_generic_function)(void);
+typedef nfsmw_generic_function (*nfsmw_egl_get_proc_address_fn)(
+    const char *name);
+
 struct relocation_context {
     struct elf32_image *images;
     size_t current_image;
     void *host_handles[RELOCATION_HOST_CAPACITY];
     size_t host_count;
+    nfsmw_egl_get_proc_address_fn egl_get_proc_address;
     struct nfsmw_relocation_probe_stats *stats;
 };
+
+extern void __aeabi_uidiv(void);
+extern void __aeabi_ui2d(void);
+extern void __aeabi_uidivmod(void);
+extern void __aeabi_uldivmod(void);
+extern void __aeabi_dmul(void);
+extern void __aeabi_dcmplt(void);
+extern void __aeabi_f2d(void);
+extern void __aeabi_ul2d(void);
+extern void __aeabi_idivmod(void);
+extern void __aeabi_idiv(void);
+extern void __aeabi_dadd(void);
 
 static void *nfsmw_dso_handle;
 static void *retained_host_handles[RELOCATION_HOST_CAPACITY];
@@ -93,6 +110,37 @@ static uintptr_t pointer_value(void *pointer)
     return result;
 }
 
+static uintptr_t function_value(nfsmw_generic_function function)
+{
+    uintptr_t result = 0U;
+
+    if (sizeof(function) == sizeof(result)) {
+        (void)memcpy(&result, &function, sizeof(result));
+    }
+    return result;
+}
+
+static uintptr_t aeabi_lookup(const char *name)
+{
+#define NFSMW_EABI_ADDRESS(symbol) \
+    if (strcmp(name, #symbol) == 0) \
+        return function_value((nfsmw_generic_function)symbol)
+
+    NFSMW_EABI_ADDRESS(__aeabi_uidiv);
+    NFSMW_EABI_ADDRESS(__aeabi_ui2d);
+    NFSMW_EABI_ADDRESS(__aeabi_uidivmod);
+    NFSMW_EABI_ADDRESS(__aeabi_uldivmod);
+    NFSMW_EABI_ADDRESS(__aeabi_dmul);
+    NFSMW_EABI_ADDRESS(__aeabi_dcmplt);
+    NFSMW_EABI_ADDRESS(__aeabi_f2d);
+    NFSMW_EABI_ADDRESS(__aeabi_ul2d);
+    NFSMW_EABI_ADDRESS(__aeabi_idivmod);
+    NFSMW_EABI_ADDRESS(__aeabi_idiv);
+    NFSMW_EABI_ADDRESS(__aeabi_dadd);
+#undef NFSMW_EABI_ADDRESS
+    return 0U;
+}
+
 static uintptr_t alias_lookup(const char *name)
 {
     if (strcmp(name, "__assert2") == 0) {
@@ -129,6 +177,16 @@ static void open_host_libraries(struct relocation_context *context)
         }
         handle = dlopen(candidates[index], RTLD_LAZY | RTLD_LOCAL);
         if (handle != NULL) {
+            if (strncmp(candidates[index], "libEGL", 6U) == 0 &&
+                context->egl_get_proc_address == NULL) {
+                void *address = dlsym(handle, "eglGetProcAddress");
+
+                if (address != NULL &&
+                    sizeof(address) == sizeof(context->egl_get_proc_address)) {
+                    (void)memcpy(&context->egl_get_proc_address, &address,
+                                 sizeof(address));
+                }
+            }
             context->host_handles[context->host_count] = handle;
             context->host_count += 1U;
         }
@@ -178,6 +236,16 @@ static uintptr_t host_lookup(const struct relocation_context *context,
         address = dlsym(context->host_handles[index], name);
         if (address != NULL) {
             return pointer_value(address);
+        }
+    }
+    if (context->egl_get_proc_address != NULL &&
+        strncmp(name, "gl", 2U) == 0) {
+        nfsmw_generic_function function =
+            context->egl_get_proc_address(name);
+
+        if (function != NULL) {
+            (void)printf("G3-REL EGL procedure resolved: %s\n", name);
+            return function_value(function);
         }
     }
     return 0U;
@@ -233,6 +301,11 @@ static uintptr_t relocation_lookup(const char *name, unsigned int binding,
             }
             return address;
         }
+    }
+    address = aeabi_lookup(name);
+    if (address != 0U) {
+        context->stats->alias_resolutions += 1U;
+        return address;
     }
     if (nfsmw_symbol_requires_softfp(name)) {
         address = nfsmw_softfp_resolve(name);

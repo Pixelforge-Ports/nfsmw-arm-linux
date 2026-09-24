@@ -42,3 +42,14 @@ by using the kernel's CPU-feature flags. FMOD uses native file callbacks for
 the prepared sound files. Please test music, menu effects, engine noises and
 crash sounds after rebuilding. If sound effects remain silent, include
 `logs/nfsmw.log` with your report.
+
+## ROCKNIX RG DS graphics
+
+For Wayland sessions, the launcher tests Mesa EGL/GLES pairs outside `mali/`
+directories before proprietary Mali libraries. This addresses the RG DS log
+that selected `/usr/lib32/mali/libEGL.so` and then reported `No mali devices
+found`. A later RG DS log confirms Mesa selection and `G5-HOST PASS`, then
+reports unresolved ARM EABI and GLES extension symbols. The runtime now maps
+the ARM helpers from libgcc and resolves GLES extensions through EGL. Rebuild
+and check for `G3 FULL RELOCATION PASS` and `G4-CTOR PASS`; this relocation fix
+still needs device confirmation.
